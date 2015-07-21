@@ -34,6 +34,7 @@ public class VerticalLinearRecyclerViewSample extends AppCompatActivity implemen
     private static final String CUSTOM_ANIMATION_DURATION_POSITION = "CUSTOM_ANIMATION_DURATION_POSITION";
     private static final String CHILD_TEXT = "Child ";
     private static final String SECOND_CHILD_TEXT = "_2";
+    private static final String ALTERNATE_CHILD_TEXT = "Alternate child text";
     private static final String PARENT_TEXT = "Parent ";
     private static final long INITIAL_ROTATION_SPEED_MS = 100;
 
@@ -67,6 +68,11 @@ public class VerticalLinearRecyclerViewSample extends AppCompatActivity implemen
 
         // Attach this activity to the Adapter as the ExpandCollapseListener
         mExpandableAdapter.addExpandCollapseListener(this);
+
+        // add the mapping
+        mExpandableAdapter.addMapping(new ParentMapping(), CustomParentObject.class);
+        mExpandableAdapter.addMapping(new ChildMapping(), CustomChildObject.class);
+        mExpandableAdapter.addMapping(new AlternateChildMapping(), CustomAlternateChildObject.class);
 
         // Set the RecyclerView's adapter to the ExpandableAdapter we just created
         mRecyclerView.setAdapter(mExpandableAdapter);
@@ -180,10 +186,14 @@ public class VerticalLinearRecyclerViewSample extends AppCompatActivity implemen
             if (i % 2 == 0) {
                 CustomChildObject customChildObject = new CustomChildObject();
                 CustomChildObject customChildObject2 = new CustomChildObject();
+                CustomAlternateChildObject alternateChild = new CustomAlternateChildObject();
                 customChildObject.setChildText(CHILD_TEXT + i);
                 customChildObject2.setChildText(CHILD_TEXT + i + SECOND_CHILD_TEXT);
+                alternateChild.setChildText(ALTERNATE_CHILD_TEXT);
                 childObjectList.add(customChildObject);
                 childObjectList.add(customChildObject2);
+                childObjectList.add(alternateChild);
+
             } else {
                 CustomChildObject customChildObject = new CustomChildObject();
                 customChildObject.setChildText(CHILD_TEXT + i);

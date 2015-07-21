@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 
 import com.bignerdranch.expandablerecyclerview.ClickListeners.ExpandCollapseListener;
 import com.bignerdranch.expandablerecyclerview.ClickListeners.ParentItemClickListener;
+import com.bignerdranch.expandablerecyclerview.Mapping.Mapping;
 import com.bignerdranch.expandablerecyclerview.Model.ParentObject;
 import com.bignerdranch.expandablerecyclerview.Model.ParentWrapper;
 import com.bignerdranch.expandablerecyclerview.ViewHolder.ChildViewHolder;
@@ -30,8 +31,6 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
     private static final String TAG = ExpandableRecyclerAdapter.class.getClass().getSimpleName();
     private static final String STABLE_ID_MAP = "ExpandableRecyclerAdapter.StableIdMap";
     private static final String STABLE_ID_LIST = "ExpandableRecyclerAdapter.StableIdList";
-    private static final int TYPE_PARENT = 0;
-    private static final int TYPE_CHILD = 1;
     public static final int CUSTOM_ANIMATION_VIEW_NOT_SET = -1;
     public static final long DEFAULT_ROTATE_DURATION_MS = 200l;
     public static final long CUSTOM_ANIMATION_DURATION_NOT_SET = -1l;
@@ -40,6 +39,7 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
     protected List<Object> mItemList;
     protected List<ParentObject> mParentItemList;
     private HashMap<Long, Boolean> mStableIdMap;
+    private HashMap<Integer, Mapping> mClassToMappingMap;
     private ExpandableRecyclerAdapterHelper mExpandableRecyclerAdapterHelper;
     private ExpandCollapseListener mExpandCollapseListener;
     private boolean mParentAndIconClickable = false;
@@ -60,6 +60,7 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
         mItemList = generateObjectList(parentItemList);
         mExpandableRecyclerAdapterHelper = new ExpandableRecyclerAdapterHelper(mItemList);
         mStableIdMap = generateStableIdMapFromList(mExpandableRecyclerAdapterHelper.getHelperItemList());
+        mClassToMappingMap = new HashMap<>();
     }
 
     /**
@@ -79,6 +80,7 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
         mExpandableRecyclerAdapterHelper = new ExpandableRecyclerAdapterHelper(mItemList);
         mStableIdMap = generateStableIdMapFromList(mExpandableRecyclerAdapterHelper.getHelperItemList());
         mCustomParentAnimationViewId = customParentAnimationViewId;
+        mClassToMappingMap = new HashMap<>();
     }
 
     /**
@@ -100,6 +102,7 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
         mStableIdMap = generateStableIdMapFromList(mExpandableRecyclerAdapterHelper.getHelperItemList());
         mCustomParentAnimationViewId = customParentAnimationViewId;
         mAnimationDuration = animationDuration;
+        mClassToMappingMap = new HashMap<>();
     }
 
     /**
@@ -111,18 +114,21 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
      *
      * @param viewGroup
      * @param viewType
-     * @return the ViewHolder that cooresponds to the item at the position.
+     * @return the ViewHolder that corresponds to the item at the position.
+     * @throws IllegalStateException if there is no @link(Mapping) associated with the @code(viewType)
      */
     @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-        if (viewType == TYPE_PARENT) {
-            PVH pvh = onCreateParentViewHolder(viewGroup);
-            pvh.setParentItemClickListener(this);
-            return pvh;
-        } else if (viewType == TYPE_CHILD) {
-            return onCreateChildViewHolder(viewGroup);
-        } else {
-            throw new IllegalStateException("Incorrect ViewType found");
+    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) throws IllegalStateException {
+        final Mapping mapping = mClassToMappingMap.get(viewType);
+        if (mapping == null) {
+            throw new IllegalStateException("No mapping found for this viewType.  See ExpandableRecyclerAdapter.addMapping");
+        }
+        else {
+            final RecyclerView.ViewHolder viewHolder = mapping.createViewHolder(viewGroup);
+            if (viewHolder instanceof ParentViewHolder) {
+                ((ParentViewHolder) viewHolder).setParentItemClickListener(this);
+            }
+            return viewHolder;
         }
     }
 
@@ -138,10 +144,16 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
      *
      * @param holder
      * @param position
-     * @throws IllegalStateException if the item in the list is neither a ParentObject or ChildObject
+     * @throws IllegalStateException if the item in the list is null or if there is no @link(Mapping) associated with the item's class
      */
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+        final Object item = mItemList.get(position);
+        final Mapping mapping = item != null ? mClassToMappingMap.get(item.getClass().hashCode()) : null;
+        if (mapping == null ) {
+            throw new IllegalStateException("No Mapping found for " + item.getClass());
+        }
+
         if (mExpandableRecyclerAdapterHelper.getHelperItemAtPosition(position) instanceof ParentWrapper) {
             PVH parentViewHolder = (PVH) holder;
 
@@ -170,11 +182,9 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
             }
 
             parentViewHolder.setExpanded(((ParentWrapper) mExpandableRecyclerAdapterHelper.getHelperItemAtPosition(position)).isExpanded());
-            onBindParentViewHolder(parentViewHolder, position, mItemList.get(position));
-        } else if (mItemList.get(position) == null) {
-            throw new IllegalStateException("Incorrect ViewHolder found");
+            mapping.bind(parentViewHolder, position, item);
         } else {
-            onBindChildViewHolder((CVH) holder, position, mItemList.get(position));
+            mapping.bind(holder, position, item);
         }
     }
 
@@ -226,18 +236,36 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
      * Returns the type of view that the item at the given position is.
      *
      * @param position
-     * @return TYPE_PARENT (0) for ParentObjects and TYPE_CHILD (1) for ChildObjects
-     * @throws IllegalStateException if the item at the given position in the list is null
+     * @return The @code(hashCode) returned by the object's class
+     * @throws IllegalStateException if there is no @link(Mapping) associated with the item's class
      */
     @Override
     public int getItemViewType(int position) {
-        if (mItemList.get(position) instanceof ParentObject) {
-            return TYPE_PARENT;
-        } else if (mItemList.get(position) == null) {
-            throw new IllegalStateException("Null object added");
-        } else {
-            return TYPE_CHILD;
+        final int key = mItemList.get(position).getClass().hashCode();
+        final Mapping mapping = mClassToMappingMap.get(key);
+        if (mapping == null) {
+            throw new IllegalStateException("No mapping for " + mItemList.get(position).getClass());
         }
+
+        return key;
+    }
+
+    /**
+     * Associate a @link(Mapping) with a class
+     *
+     * @param mapping The mapping to associate
+     * @param c The class the mapping is associated with
+     */
+    public void addMapping(Mapping mapping, Class c) {
+        mClassToMappingMap.put(c.hashCode(), mapping);
+    }
+
+    /**
+     * Removes a mapping for the specified class
+     * @param c The class to remove the mapping for
+     */
+    public void removeMapping(Class c) {
+        mClassToMappingMap.remove(c.hashCode());
     }
 
     /**
