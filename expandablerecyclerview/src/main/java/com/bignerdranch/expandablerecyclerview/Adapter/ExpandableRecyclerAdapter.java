@@ -189,40 +189,6 @@ public abstract class ExpandableRecyclerAdapter<PVH extends ParentViewHolder, CV
     }
 
     /**
-     * Creates the Parent ViewHolder. Called from onCreateViewHolder when the item is a ParenObject.
-     *
-     * @param parentViewGroup
-     * @return ParentViewHolder that the user must create and inflate.
-     */
-    public abstract PVH onCreateParentViewHolder(ViewGroup parentViewGroup);
-
-    /**
-     * Creates the Child ViewHolder. Called from onCreateViewHolder when the item is a ChildObject.
-     *
-     * @param childViewGroup
-     * @return ChildViewHolder that the user must create and inflate.
-     */
-    public abstract CVH onCreateChildViewHolder(ViewGroup childViewGroup);
-
-    /**
-     * Binds the data to the ParentViewHolder. Called from onBindViewHolder when the item is a
-     * ParentObject
-     *
-     * @param parentViewHolder
-     * @param position
-     */
-    public abstract void onBindParentViewHolder(PVH parentViewHolder, int position, Object parentObject);
-
-    /**
-     * Binds the data to the ChildViewHolder. Called from onBindViewHolder when the item is a
-     * ChildObject
-     *
-     * @param childViewHolder
-     * @param position
-     */
-    public abstract void onBindChildViewHolder(CVH childViewHolder, int position, Object childObject);
-
-    /**
      * Returns the size of the list that contains Parent and Child objects
      *
      * @return integer value of the size of the Parent/Child list
